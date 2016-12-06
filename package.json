@@ -10,12 +10,8 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "body-parser": "^1.15.2",
     "ejs": "2.4.1",
     "express": "4.13.3",
-    "firebase": "^3.6.1",
-    "firebase-queue": "^1.6.0",
-    "googlemaps": "^1.11.1"
   },
   "repository": {
     "type": "git",

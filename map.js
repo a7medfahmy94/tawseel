@@ -1,8 +1,39 @@
+// Init firebase
+var initFirebase = function() {
+  var config = {
+    apiKey: 'AIzaSyDn_NMUsa9sVsYm19ApwK2U8juSC1PYLfM',
+    authDomain: "tawseel-37034.firebaseapp.com",
+    databaseURL: "https://tawseel-37034.firebaseio.com",
+    storageBucket: "tawseel-37034.appspot.com",
+    messagingSenderId: "534910965048"
+  };
+  firebase.initializeApp(config);
+}
+initFirebase();
+// End init firebase
+
+var database = firebase.database();
+var tripsRef = database.ref('/trips');
+
+// called when user starts a new trip
+// pushes a new trip and listens for updates
+function newTrip() {
+  var key = tripsRef.push().key;
+  tripsRef.child(key).update({
+    logs: [],
+    startAt: new Date(),
+    state: 'started'
+  })
+  window.onRoute = true;
+  window.tripId = key;
+}
+
 function initMap() {
   if (!navigator.geolocation) {
     alert("Geolocation is not supported by this browser.");
   }
-  window.points = [];
+  // this holds all the logs for the trip, including all points
+  window.logs = [];
   navigator.geolocation.getCurrentPosition(function(position){
     var center = {
       lat: position.coords.latitude,
@@ -20,69 +51,41 @@ function initMap() {
 }
 
 function addPoint(lat, lng, map) {
-  if (!tripId) {
+  if (!window.onRoute) {
     return;
   }
-  $("#begin-trip").html('End')
-  window.points.push({
-    lat: lat,
-    lng: lng
-  });
-  if (window.points.length == 1) {
-    window.marker = new google.maps.Marker({position: window.points[0],map: map,title: 'Start'});
-    $.post("/move",{tripId: window.tripId,cost: 0,point: window.points[0]});
-    return;
-  } else {
-    window.marker.setMap(null);
+  $("#begin-trip").html('End');
+  var log = {
+    point: {
+      lat: lat,
+      lng: lng
+    },
+    time: (+new Date())
   }
+  window.logs.push(log);
+  var newLog = tripsRef.child(window.tripId+'/logs').push();
+  newLog.set(log);
 
-  var directionsDisplay = new google.maps.DirectionsRenderer({
-    map: map
-  });
-  // Set destination, origin and travel mode.
-  var request = {
-    destination: window.points[window.points.length - 1],
-    origin: window.points[window.points.length - 2],
-    travelMode: 'DRIVING',
-    waypoints: window.points.map(function(point){
-      return {
-        location: point,
-        stopover: true
-      }
-    })
-  };
-
-  // Pass the directions request to the directions service.
-  var directionsService = new google.maps.DirectionsService();
-  directionsService.route(request, function(response, status) {
-    if (status == 'OK') {
-      // Display the route on the map.
-      directionsDisplay.setDirections(response);
-      $.post('/move',{
-        tripId: window.tripId,
-        point: window.points[window.points.length - 1],
-        cost: response.routes[0].legs.reduce(function(sum,leg){
-          return sum + leg.distance.value;
-        },0)
-      }).done(function(response){
-        $("#cost").html(response.cost + " SAR");
-      })
-    }
-  });
+  window.marker = new google.maps.Marker({position: log.point,map: map,title: window.logs.length.toString()});
 }
 
+
+function end() {
+  var tripRef = tripsRef.child(window.tripId);
+  tripRef.update({state: 'ended'});
+  database.ref('/queue/tasks').push({
+    tripId: window.tripId
+  })
+}
 
 $(function(){
   $("#begin-trip").on('click', function(){
     if ($(this).html() == 'End') {
       $(this).html('Trip ended, refresh for a new trip!');
-      $.post('/end',{tripId: window.tripId});
-      return;
+      end();
     } else {
       $(this).html('Click on map for initial position');
-      $.get('/newTrip').then(function(response){
-        window.tripId = response.tripId;
-      })
+      newTrip();
     }
   })
 })
