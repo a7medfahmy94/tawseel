@@ -14,4 +14,4 @@ app.get('/', function(request, response) {
   response.render('pages/index');
 });
 
-app.listen(5000);
+app.listen(app.get('port'));
